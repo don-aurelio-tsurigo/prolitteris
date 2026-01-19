@@ -1,0 +1,14 @@
+{
+  "authors": {
+    "Vorname Nachname": {
+      "firstName": "Vorname",
+      "surName": "Nachname",
+      "memberId": "123456"
+    },
+    "Max Mustermann": {
+      "firstName": "Max",
+      "surName": "Mustermann",
+      "memberId": "999999"
+    }
+  }
+}

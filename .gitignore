@@ -1,0 +1,30 @@
+# Environment & Credentials
+.env
+.env.local
+
+# Author Member IDs (sensible Daten)
+authors.json
+
+# URLs Liste (könnte sensible URLs enthalten)
+urls.txt
+artikel.csv
+test-*.csv
+
+# Logs
+logs/
+*.log
+
+# Composer
+/vendor/
+composer.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
