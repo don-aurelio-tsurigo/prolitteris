@@ -1,6 +1,6 @@
 <?php
 
-namespace Bajour\ProLitteris;
+namespace Tsüri\ProLitteris;
 
 use GuzzleHttp\Client;
 use Symfony\Component\DomCrawler\Crawler;
@@ -150,7 +150,7 @@ class ArticleScraper
      */
     private function extractTitle(Crawler $crawler): ?string
     {
-        // Versuche verschiedene Selektoren für bajour.ch
+        // Versuche verschiedene Selektoren für tsri.ch
         $selectors = [
             'h1.article-title',
             'h1.entry-title',
