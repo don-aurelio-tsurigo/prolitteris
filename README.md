@@ -1,4 +1,4 @@
-# ProLitteris Reporter für bajour.ch
+# ProLitteris Reporter für Tsüri.ch
 
 Automatische Meldung von bajour.ch Artikeln an ProLitteris.
 
@@ -40,9 +40,9 @@ PROLITTERIS_API_URL=https://owen.prolitteris.ch/rest/api/1/message
 Erstelle eine Datei `urls.txt` mit einer URL pro Zeile:
 
 ```
-https://bajour.ch/artikel/mein-artikel-1
-https://bajour.ch/artikel/mein-artikel-2
-https://bajour.ch/artikel/mein-artikel-3
+https://tsri.ch/artikel/mein-artikel-1
+https://tsri.ch/artikel/mein-artikel-2
+https://tsri.ch/artikel/mein-artikel-3
 ```
 
 ### 2. Script ausführen
