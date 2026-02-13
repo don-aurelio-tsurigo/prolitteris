@@ -1,24 +1,27 @@
 # ProLitteris Reporter für Tsüri.ch
 
-Automatische Meldung von bajour.ch Artikeln an ProLitteris.
+Automatische Meldung von Artikeln von **tsri.ch** an ProLitteris gemäss offizieller API-Spezifikation.
+
+## Zweck
+
+Dieses Skript dient der periodischen Erfassung und Meldung aller veröffentlichten Artikel von tsri.ch an ProLitteris (Urheberrechtsvergütung für Online-Texte).
 
 ## Features
 
-- ✅ Automatisches Scraping von Artikel-URLs
-- ✅ Erkennung der eingebauten ProLitteris Zählmarken
-- ✅ Extraktion von Titel, Text und Autoren
-- ✅ Automatische Meldung via ProLitteris REST API
-- ✅ Logging und Error-Handling
-- ✅ Validierung der Daten vor dem Versand
+- Automatisches Einlesen von Artikel-URLs aus Datei  
+- Scraping von Titel, Text und Autor(en)  
+- Erkennung der eingebetteten ProLitteris-Zählmarke (Pixel)  
+- Validierung gemäss ProLitteris-Spezifikation  
+- Meldung via ProLitteris REST API  
+- Robustes Error-Handling (Timeouts, Duplikate, Validierungsfehler)  
+- Statistik-Ausgabe (erfolgreich / übersprungen / fehlgeschlagen)  
 
 ## Installation
 
 ```bash
-# Dependencies installieren
 composer install
-
-# Environment-Datei erstellen
 cp .env.example .env
+
 ```
 
 ## Konfiguration
@@ -26,10 +29,10 @@ cp .env.example .env
 Bearbeite die `.env` Datei mit deinen ProLitteris Zugangsdaten:
 
 ```env
-PROLITTERIS_MEMBER_ID=885830
-PROLITTERIS_USERNAME=dein_username
-PROLITTERIS_PASSWORD=dein_password
-PROLITTERIS_DOMAIN=pl02.owen.prolitteris.ch
+PROLITTERIS_MEMBER_ID=DEINE_MEMBER_ID
+PROLITTERIS_USERNAME=DEINE_EMAIL
+PROLITTERIS_PASSWORD=DEIN_PASSWORT
+PROLITTERIS_DOMAIN=pl01.owen.prolitteris.ch
 PROLITTERIS_API_URL=https://owen.prolitteris.ch/rest/api/1/message
 ```
 
@@ -40,9 +43,8 @@ PROLITTERIS_API_URL=https://owen.prolitteris.ch/rest/api/1/message
 Erstelle eine Datei `urls.txt` mit einer URL pro Zeile:
 
 ```
-https://tsri.ch/artikel/mein-artikel-1
-https://tsri.ch/artikel/mein-artikel-2
-https://tsri.ch/artikel/mein-artikel-3
+https://tsri.ch/a/...
+https://tsri.ch/a/...
 ```
 
 ### 2. Script ausführen
@@ -61,7 +63,7 @@ Für jede URL:
 
 1. **Scraping**: Lädt den Artikel von der URL
 2. **Zählmarke finden**: Sucht nach dem ProLitteris Pixel-Tag
-   - Format: `http://pl02.owen.prolitteris.ch/na/plzm.xxx` oder `vzm.xxx`
+   - Format: `http://pl01.owen.prolitteris.ch/na/plzm.xxx` oder `vzm.xxx`
 3. **Daten extrahieren**:
    - Titel (h1, meta tags)
    - Artikeltext (bereinigt, ohne Navigation/Footer)
@@ -100,42 +102,6 @@ Laut API-Spec können folgende Fehler auftreten:
 - **31-37**: Fehler bei Urheber-Angaben
 - **99**: Feldvalidierung fehlgeschlagen
 
-## Erweiterte Verwendung
-
-### Programmgesteuert verwenden
-
-```php
-<?php
-require_once 'vendor/autoload.php';
-
-use Bajour\ProLitteris\ArticleScraper;
-use Bajour\ProLitteris\ProLitterisClient;
-
-$scraper = new ArticleScraper('pl02.owen.prolitteris.ch');
-$client = new ProLitterisClient('885830', 'username', 'password', 'https://...');
-
-// Artikel scrapen
-$article = $scraper->scrapeArticle('https://bajour.ch/artikel/...');
-
-// An ProLitteris melden
-if ($article) {
-    $response = $client->submitArticle($article);
-}
-```
-
-### Bereits gemeldete Artikel suchen
-
-```php
-// Alle Meldungen abrufen
-$messages = $client->searchMessages();
-
-// Mit Filter
-$messages = $client->searchMessages([
-    'title' => 'Suchbegriff',
-    'createdDateFrom' => '2024-01-01',
-    'createdDateTo' => '2024-12-31'
-]);
-```
 
 ## Struktur
 
@@ -173,4 +139,4 @@ Bei Problemen mit:
 
 ## Lizenz
 
-Internes Tool für bajour.ch
+Internes Tool für Tsüri.ch
