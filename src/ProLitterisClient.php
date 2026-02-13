@@ -23,80 +23,98 @@ class ProLitterisClient
         $this->apiUrl = $apiUrl;
         $this->logger = $logger;
 
-        // Basic Authentication nach ProLitteris Spec: base64(memberId:username:password)
+        // Authorization: OWEN base64(memberId:username:password)
         $authString = "{$memberId}:{$username}:{$password}";
         $this->authHeader = 'OWEN ' . base64_encode($authString);
 
         $this->httpClient = new Client([
             'timeout' => 30,
-            'verify' => true, // SSL verification
+            'verify' => true,
         ]);
     }
 
     /**
      * Meldet einen Artikel an ProLitteris
-     *
-     * @param array $articleData Array mit: title, plainText, participants, pixelUid
-     * @return array Response von ProLitteris
-     * @throws \Exception Bei Fehlern
      */
     public function submitArticle(array $articleData): array
     {
         $this->validateArticleData($articleData);
 
-        // Text base64 kodieren wie in der Spec verlangt
         $payload = [
             'title' => $articleData['title'],
             'messageText' => [
-                'plainText' => base64_encode($articleData['plainText'])
+                'plainText' => base64_encode($articleData['plainText']),
             ],
             'participants' => $articleData['participants'],
-            'pixelUid' => $articleData['pixelUid']
+            'pixelUid' => $articleData['pixelUid'],
         ];
 
         $this->log('info', "Melde Artikel an ProLitteris: {$articleData['title']}", [
             'pixelUid' => $articleData['pixelUid'],
             'textLength' => strlen($articleData['plainText']),
-            'participants' => count($articleData['participants'])
+            'participants' => count($articleData['participants']),
         ]);
 
         try {
             $response = $this->httpClient->post($this->apiUrl, [
                 'headers' => [
-                    'Content-Type' => 'application/json; charset=UTF-8',
+                    'Content-Type'  => 'application/json; charset=UTF-8',
                     'Authorization' => $this->authHeader,
                 ],
                 'json' => $payload,
             ]);
 
-            $responseData = json_decode($response->getBody()->getContents(), true);
+            $responseData = json_decode((string) $response->getBody(), true);
 
             $this->log('info', "Artikel erfolgreich gemeldet", [
-                'title' => $articleData['title'],
-                'createdAt' => $responseData['createdAt'] ?? null
+                'title'     => $articleData['title'],
+                'createdAt' => $responseData['createdAt'] ?? null,
             ]);
 
             return $responseData;
 
         } catch (GuzzleException $e) {
-            $errorBody = null;
-            if ($e->hasResponse()) {
-                $errorBody = $e->getResponse()->getBody()->getContents();
+
+    // Timeout / Verbindungsproblem → als übersprungen behandeln
+    if (str_contains($e->getMessage(), 'cURL error 28')) {
+        $this->log('warning', 'Timeout bei ProLitteris API – übersprungen', [
+            'article' => $articleData['title'] ?? null,
+            'pixelUid' => $articleData['pixelUid'] ?? null,
+        ]);
+        return ['skipped' => true];
+    }
+
+    $errorBody = null;
+
+            if (method_exists($e, 'hasResponse') && $e->hasResponse()) {
+                $errorBody = (string) $e->getResponse()->getBody();
                 $errorData = json_decode($errorBody, true);
 
-                $this->log('error', "ProLitteris API Fehler: " . ($errorData['error']['message'] ?? 'Unbekannt'), [
-                    'code' => $errorData['error']['code'] ?? null,
-                    'fieldErrors' => $errorData['error']['fieldErrors'] ?? null,
-                    'article' => $articleData['title']
+                $errorCode = $errorData['error']['code'] ?? null;
+                $errorMessage = $errorData['error']['message'] ?? 'Unbekannt';
+
+                // Fehlercode 12: Zählmarke bereits gemeldet → überspringen
+                if ($errorCode === 12) {
+                    $this->log('info', 'Zählmarke bereits gemeldet – übersprungen', [
+                        'article'  => $articleData['title'] ?? null,
+                        'pixelUid' => $articleData['pixelUid'] ?? null,
+                    ]);
+                    return ['skipped' => true];
+                }
+
+                $this->log('error', "ProLitteris API Fehler: {$errorMessage}", [
+                    'code'       => $errorCode,
+                    'fieldErrors'=> $errorData['error']['fieldErrors'] ?? null,
+                    'article'    => $articleData['title'] ?? null,
+                ]);
+            } else {
+                $this->log('error', 'Technischer Fehler bei ProLitteris API', [
+                    'exception' => $e->getMessage(),
+                    'article'   => $articleData['title'] ?? null,
                 ]);
             }
 
-            throw new \Exception(
-                "Fehler beim Melden des Artikels: " . $e->getMessage() .
-                ($errorBody ? " | Response: {$errorBody}" : ''),
-                $e->getCode(),
-                $e
-            );
+            throw $e;
         }
     }
 
@@ -111,12 +129,12 @@ class ProLitterisClient
         try {
             $response = $this->httpClient->get($url, [
                 'headers' => [
-                    'Content-Type' => 'application/json; charset=UTF-8',
+                    'Content-Type'  => 'application/json; charset=UTF-8',
                     'Authorization' => $this->authHeader,
                 ],
             ]);
 
-            return json_decode($response->getBody()->getContents(), true);
+            return json_decode((string) $response->getBody(), true);
 
         } catch (GuzzleException $e) {
             $this->log('error', "Fehler bei der Meldungsrecherche: " . $e->getMessage());
@@ -137,20 +155,16 @@ class ProLitterisClient
             }
         }
 
-        // Textlänge prüfen (min 1500 Zeichen laut Spec)
-        $textLength = strlen($data['plainText']);
-        if ($textLength < 1500) {
-            $this->log('warning', "Text ist kürzer als 1500 Zeichen ({$textLength})", [
-                'title' => $data['title']
+        if (strlen($data['plainText']) < 1500) {
+            $this->log('warning', "Text ist kürzer als 1500 Zeichen", [
+                'title' => $data['title'],
             ]);
         }
 
-        // Mindestens ein Urheber erforderlich
         if (empty($data['participants'])) {
             throw new \InvalidArgumentException("Mindestens ein Urheber muss angegeben werden");
         }
 
-        // Prüfe, ob mindestens ein AUTHOR vorhanden ist
         $hasAuthor = false;
         foreach ($data['participants'] as $participant) {
             if (($participant['participation'] ?? '') === 'AUTHOR') {

@@ -13,12 +13,12 @@ class ArticleScraper
     private string $expectedDomain;
     private array $authorMemberIds = [];
 
-    public function __construct(string $expectedDomain = 'pl02.owen.prolitteris.ch', ?LoggerInterface $logger = null)
+    public function __construct(string $expectedDomain = 'pl01.owen.prolitteris.ch', ?LoggerInterface $logger = null)
     {
         $this->httpClient = new Client([
             'timeout' => 30,
             'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (compatible; ProLitteris-Reporter/1.0)',
+                'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             ],
         ]);
         $this->expectedDomain = $expectedDomain;
@@ -79,21 +79,12 @@ class ArticleScraper
                 $this->log('error', "Kein ausreichender Text gefunden in: {$url}");
                 return null;
             }
-
             // Autoren extrahieren
-            $participants = $this->extractAuthors($crawler);
-            if (empty($participants)) {
-                $this->log('warning', "Keine Autoren gefunden in: {$url}");
-                // Erstelle einen Platzhalter-Autor
-                $participants = [
-                    [
-                        'participation' => 'AUTHOR',
-                        'firstName' => 'Unbekannt',
-                        'surName' => 'Unbekannt'
-                    ]
-                ];
-            }
-
+           $participants = $this->extractAuthors($crawler);
+if (empty($participants)) {
+    $this->log('warning', "Keine Autoren gefunden – Artikel wird übersprungen: {$url}");
+    return null;
+}
             $articleData = [
                 'url' => $url,
                 'title' => $title,
@@ -122,28 +113,14 @@ class ArticleScraper
      * Extrahiert die ProLitteris Zählmarke aus dem HTML
      */
     private function extractPixelUid(Crawler $crawler, string $html): ?string
-    {
-        // Methode 1: Suche nach IMG-Tag mit ProLitteris Domain
-        try {
-            $imgNode = $crawler->filter("img[src*='{$this->expectedDomain}']")->first();
-            if ($imgNode->count() > 0) {
-                $src = $imgNode->attr('src');
-                // Extrahiere Zählmarke aus URL: http://pl02.owen.prolitteris.ch/na/plzm.xxx oder /na/vzm.xxx
-                if (preg_match('#/(?:na|pw)/((?:plzm|vzm)\.[a-zA-Z0-9\-]+)#', $src, $matches)) {
-                    return $matches[1];
-                }
-            }
-        } catch (\Exception $e) {
-            // Weiter mit anderen Methoden
-        }
-
-        // Methode 2: Suche direkt im HTML mit Regex
-        if (preg_match('#' . preg_quote($this->expectedDomain, '#') . '/(?:na|pw)/((?:plzm|vzm)\.[a-zA-Z0-9\-]+)#', $html, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
+{
+    // Direkte Suche nach plzm. oder vzm. im HTML (robust gegen SSR/JS-Strukturen)
+    if (preg_match('#/(?:na|pw)/((?:plzm|vzm)\.[a-zA-Z0-9\-]+)#', $html, $matches)) {
+        return $matches[1];
     }
+
+    return null;
+}
 
     /**
      * Extrahiert den Titel des Artikels
@@ -245,17 +222,22 @@ class ArticleScraper
                         } else {
                             $authorName = trim($node->text());
                         }
+if ($authorName && strlen($authorName) > 2) {
 
-                        if ($authorName && strlen($authorName) > 2) {
-                            // Versuche Namen zu splitten (Vorname Nachname)
-                            $nameParts = $this->splitName($authorName);
+    // Organisations-/Fallback-Autoren verwerfen (z. B. "Tsüri.ch")
+    $normalized = strtolower(trim($authorName));
+    if ($normalized === 'tsüri.ch' || $normalized === 'tsueri.ch' || str_contains($normalized, 'tsüri')) {
+        return;
+    }
 
-                            $authorData = [
-                                'participation' => 'AUTHOR',
-                                'firstName' => $nameParts['firstName'],
-                                'surName' => $nameParts['surName']
-                            ];
+    // Versuche Namen zu splitten (Vorname Nachname)
+    $nameParts = $this->splitName($authorName);
 
+    $authorData = [
+        'participation' => 'AUTHOR',
+        'firstName' => $nameParts['firstName'],
+        'surName' => $nameParts['surName']
+    ];
                             // Prüfe, ob eine Member ID für diesen Autor hinterlegt ist
                             $memberId = $this->findMemberIdForAuthor($authorName);
                             if ($memberId) {

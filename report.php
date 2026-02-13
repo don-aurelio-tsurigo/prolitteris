@@ -74,24 +74,28 @@ foreach ($urls as $index => $url) {
     }
 
     // Melde an ProLitteris
-    try {
-        $response = $client->submitArticle($articleData);
+try {
+    $response = $client->submitArticle($articleData);
+    if (isset($response['skipped']) && $response['skipped'] === true) {
+        $logger->info("↷ Übersprungen (bereits gemeldet): {$articleData['title']}");
+        $stats['skipped']++;
+    } else {
         $logger->info("✓ Erfolgreich gemeldet: {$articleData['title']}", [
             'createdAt' => $response['createdAt'] ?? null
         ]);
         $stats['success']++;
-
-        // Optional: Kleine Pause zwischen Requests
-        sleep(1);
-
-    } catch (\Exception $e) {
-        $logger->error("✗ Fehler beim Melden: {$articleData['title']}", [
-            'error' => $e->getMessage()
-        ]);
-        $stats['failed']++;
     }
-}
 
+    // Optional: Kleine Pause zwischen Requests
+    sleep(1);
+
+} catch (\Exception $e) {
+    $logger->error("✗ Fehler beim Melden: {$articleData['title']}", [
+        'error' => $e->getMessage()
+    ]);
+    $stats['failed']++;
+}
+}
 // Zusammenfassung
 $logger->info("=== Verarbeitung abgeschlossen ===");
 $logger->info("Gesamt: {$stats['total']}");
